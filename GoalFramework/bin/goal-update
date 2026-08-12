@@ -1,0 +1,12 @@
+﻿#!/usr/bin/env sh
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if command -v python3 >/dev/null 2>&1; then PYTHON=python3
+elif command -v python >/dev/null 2>&1; then PYTHON=python
+else echo "goal-update: Python 3.10+ is required." >&2; exit 127
+fi
+printf '\nGoal Framework 更新\n项目目录：%s\n' "$(pwd)"
+printf '%s' '将先显示跨版本变更说明。按回车继续，输入 0 取消： '
+read -r answer
+[ "$answer" = "0" ] && exit 0
+exec "$PYTHON" "$SCRIPT_DIR/goal-update.py"

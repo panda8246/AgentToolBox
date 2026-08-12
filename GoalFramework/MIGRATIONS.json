@@ -1,0 +1,29 @@
+﻿{
+  "releases": [
+    {
+      "version": "1.0.0",
+      "changes": [
+        "首次发布三层目标框架：项目总纲、活跃目标与归档目标。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        "goals/GOAL-TEMPLATE.md"
+      ],
+      "manualActions": []
+    },
+    {
+      "version": "1.1.0",
+      "changes": [
+        "新增项目版本清单 `.goal-framework.json` 与 `goal-update`。",
+        "归档目标文件名中的日期改为归档日期。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        "goals/GOAL-TEMPLATE.md"
+      ],
+      "manualActions": [
+        "不会自动修改 docs/PROJECT.md、docs/CURRENT.md 或已有目标文件。若项目的 AGENTS.md 曾手动复制旧命名规则，请按新版规则调整。"
+      ]
+    }
+  ]
+}
