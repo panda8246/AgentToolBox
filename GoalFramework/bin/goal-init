@@ -1,0 +1,36 @@
+﻿#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=python
+else
+  echo "goal-init: Python 3.10+ is required." >&2
+  exit 127
+fi
+
+printf '\nGoal Framework 初始化\n'
+printf '项目目录：%s\n' "$(pwd)"
+printf '%s\n' '请选择要使用的 Agent：'
+printf '%s\n' '  1. 自动检测（推荐）'
+printf '%s\n' '  2. Codex'
+printf '%s\n' '  3. Cursor'
+printf '%s\n' '  4. OpenCode'
+printf '%s\n' '  5. 只创建框架，稍后自行让 Agent 填写'
+printf '%s\n' '  0. 取消'
+printf '%s' '输入数字： '
+read -r selection
+
+case "$selection" in
+  1) set -- --agent auto ;;
+  2) set -- --agent codex ;;
+  3) set -- --agent cursor ;;
+  4) set -- --agent opencode ;;
+  5) set -- --agent manual --skip-native-init --no-agent-prompt ;;
+  0) printf '%s\n' '已取消。'; exit 0 ;;
+  *) printf '%s\n' '无效选择，未执行任何操作。' >&2; exit 1 ;;
+esac
+
+exec "$PYTHON" "$SCRIPT_DIR/goal-init.py" "$@"
