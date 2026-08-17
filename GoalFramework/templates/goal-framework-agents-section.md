@@ -10,6 +10,7 @@
 
 ## 维护规则
 
+- 若环境提供 `goal-framework-operator` skill，目标的新建、检查点、检查和归档优先使用其 Python `goal-framework` 命令；不要简写为 `goal`，以免与 Agent 自身的目标功能混淆。
 - `docs/PROJECT.md` 只保存长期愿景、目的、边界、原则与阶段方向。
 - `docs/CURRENT.md` 是唯一的全局当前状态；只列活跃目标、阻塞项和下一步。
 - 需要独立推进、探索或验收时，创建一个目标文件。目标可为“交付型”或“探索型”。

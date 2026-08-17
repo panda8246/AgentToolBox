@@ -1,4 +1,4 @@
-﻿{
+{
   "releases": [
     {
       "version": "1.0.0",
@@ -24,6 +24,34 @@
       "manualActions": [
         "不会自动修改 docs/PROJECT.md、docs/CURRENT.md 或已有目标文件。若项目的 AGENTS.md 曾手动复制旧命名规则，请按新版规则调整。"
       ]
+    },
+    {
+      "version": "1.2.0",
+      "changes": [
+        "新增 goal-framework-operator skill 与 Python goal-framework 生命周期命令。",
+        "目标模板的完成条件改为复选框，并将当前进度拆分为结构化子区块。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        "goals/GOAL-TEMPLATE.md",
+        "skills/goal-framework-operator (框架发行包)"
+      ],
+      "manualActions": [
+        "已有活跃目标不会自动改写。使用 operator skill 前，请将完成条件改为 `- [ ]`/`- [x]`，并按新版模板整理当前进度区块。",
+        "若项目停留在 1.2.0，需要手动安装 skill；升级到 1.3.0 或更高版本后将由 goal-update 自动安装。"
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "changes": [
+        "goal-init 自动将 goal-framework-operator 安装到项目 .agents/skills/。",
+        "goal-update 自动同步项目级 skill，并通过状态清单清理旧版受管文件。"
+      ],
+      "managedFiles": [
+        ".agents/skills/goal-framework-operator/**",
+        ".goal-framework.json"
+      ],
+      "manualActions": []
     }
   ]
 }
