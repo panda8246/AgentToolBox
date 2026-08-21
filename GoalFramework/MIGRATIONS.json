@@ -70,6 +70,22 @@
         "不会改写已有目标或创建 docs/technical-plans/。旧目标仍然有效；首次执行 plan attach 时会自动加入技术方案区块。",
         "不会创建、修改、移动或删除 docs/technical-plans/ 中的技术文档。"
       ]
+    },
+    {
+      "version": "1.4.1",
+      "changes": [
+        "Agent 与 operator skill 新增明确的技术方案留档流程：用户要求后写入 .md、关联明确目标、运行 doctor 并报告结果。",
+        "明确普通讨论不授权写文件，且目标不明确时不得猜测关联对象。",
+        "明确非用户指定更新时不得覆盖已有技术方案。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        ".agents/skills/goal-framework-operator/**",
+        ".goal-framework.json"
+      ],
+      "manualActions": [
+        "本次升级只更新受管提示词与 skill，不创建或修改 docs/technical-plans/、已有目标和项目状态文档。"
+      ]
     }
   ]
 }

@@ -24,12 +24,22 @@ If `python` is unavailable, locate a Python 3.10+ interpreter and use it explici
 1. Run `goal-framework doctor` before the first mutation in a session.
 2. Read `docs/PROJECT.md`, `docs/CURRENT.md`, and the relevant active goal before deciding what to change.
 3. Read every technical plan linked by the goal, in list order, before coding. If a plan conflicts with the goal or current code/configuration, report it and reconcile the documents before implementation.
-4. Create or edit files under `docs/technical-plans/` only when the user explicitly requests that the technical plan be saved. The plan body is free-form Markdown and is not managed by this command.
+4. Treat ordinary discussion, review, or brainstorming as no authorization to write a technical plan. When the user explicitly asks to save one, follow the persistence workflow below.
 5. Use `new` only for work needing independent progress, exploration, or acceptance. Do not create a goal for a small one-turn edit.
 6. Use `checkpoint` after meaningful, reusable progress. Record facts and evidence, not chat history.
 7. Verify every completion condition before marking it satisfied.
 8. Run `complete` only after every condition is checked. Provide concrete evidence and a concise result.
 9. Run `doctor` again after mutations and report any remaining warnings.
+
+## Technical plan persistence
+
+When the user explicitly asks to save, persist, record, or archive a technical plan (or clearly expresses equivalent intent):
+
+1. Distill the agreed plan into a standalone document. Preserve key decisions, implementation steps, validation, and unresolved items; do not copy the full chat transcript.
+2. Create `docs/technical-plans/` if needed and write a UTF-8 Markdown file named `docs/technical-plans/<descriptive-name>.md`. The body remains free-form and is not parsed by Goal Framework.
+3. Do not overwrite an existing document unless the user explicitly asked to update it. Choose a new descriptive filename on an unintended collision.
+4. If one active goal is clearly identified, run `plan attach` after the file is written. If no goal is known or the reference is ambiguous, do not guess: report that the document is saved but unlinked and ask which goal to use.
+5. Run `goal-framework doctor`, then report the document path, linked goal if any, and validation result.
 
 ## Operations
 

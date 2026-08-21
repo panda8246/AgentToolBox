@@ -88,6 +88,10 @@ skill 版本及受管文件；即使框架版本没有变化，再运行 `goal-u
 `docs/technical-plans/`。Goal Framework 不创建或解析技术方案正文，只通过目标文件中的普通
 Markdown 链接维护关联：
 
+普通的方案讨论不会自动写文件。用户明确要求保存、留档、落盘或归档后，Agent 会把已确认方案
+整理为 `docs/technical-plans/<name>.md`；若能唯一确定活跃目标，则继续执行 `plan attach` 和
+`doctor`，最后报告文档路径、关联目标与检查结果。目标不明确时只保存文档，不猜测关联对象。
+
 ```sh
 python .agents/skills/goal-framework-operator/scripts/goal-framework --project . plan attach \
   2026-08-21-export-data.md docs/technical-plans/export-data.md
