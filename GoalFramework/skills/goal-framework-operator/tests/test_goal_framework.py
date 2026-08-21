@@ -102,6 +102,12 @@ class GoalFrameworkTests(unittest.TestCase):
         self.assertEqual(0, result, error)
         return self.root / "goals" / "active" / f"{TODAY}-{slug}.md"
 
+    def create_plan(self, name: str, content: str = "free-form plan\n") -> Path:
+        path = self.root / "docs" / "technical-plans" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
     def test_doctor_accepts_clean_initialized_project(self) -> None:
         result, output, error = self.run_main("doctor", "--strict")
         self.assertEqual(0, result, error)
@@ -186,6 +192,151 @@ class GoalFrameworkTests(unittest.TestCase):
         active = self.create_goal("choose-storage", "exploration")
         self.assertIn("- 类型：探索型", active.read_text(encoding="utf-8"))
 
+    def test_new_goal_has_optional_plan_section_and_old_goal_can_attach(self) -> None:
+        active = self.create_goal()
+        text = active.read_text(encoding="utf-8")
+        self.assertIn("## 技术方案\n\n暂无。", text)
+
+        active.write_text(
+            text.replace("\n## 技术方案\n\n暂无。\n", ""), encoding="utf-8"
+        )
+        result, _, error = self.run_main(
+            "checkpoint", active.name, "--done", "Old goal remains writable"
+        )
+        self.assertEqual(0, result, error)
+
+        document = self.create_plan("existing-goal.md")
+        result, _, error = self.run_main(
+            "plan", "attach", active.name, document.relative_to(self.root).as_posix()
+        )
+        self.assertEqual(0, result, error)
+        text = active.read_text(encoding="utf-8")
+        self.assertIn("## 技术方案", text)
+        self.assertIn("[existing-goal.md]", text)
+
+    def test_plan_attach_multiple_status_and_detach_missing_document(self) -> None:
+        active = self.create_goal()
+        first = self.create_plan("design one.md")
+        second = self.create_plan("补充设计.md")
+        for document in (first, second):
+            result, _, error = self.run_main(
+                "plan",
+                "attach",
+                active.name,
+                document.relative_to(self.root).as_posix(),
+            )
+            self.assertEqual(0, result, error)
+
+        text = active.read_text(encoding="utf-8")
+        self.assertIn("[design one.md](../../docs/technical-plans/design%20one.md)", text)
+        self.assertIn("[补充设计.md](../../docs/technical-plans/", text)
+        result, output, error = self.run_main("status")
+        self.assertEqual(0, result, error)
+        self.assertIn("技术方案 2", output)
+
+        first.unlink()
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("plan.missing", output)
+        result, _, error = self.run_main(
+            "plan", "detach", active.name, first.relative_to(self.root).as_posix()
+        )
+        self.assertEqual(0, result, error)
+        result, _, error = self.run_main(
+            "plan", "detach", active.name, second.relative_to(self.root).as_posix()
+        )
+        self.assertEqual(0, result, error)
+        self.assertTrue(second.is_file())
+        self.assertIn(
+            "## 技术方案\n\n暂无。", active.read_text(encoding="utf-8")
+        )
+        result, output, error = self.run_main("doctor", "--strict")
+        self.assertEqual(0, result, error + output)
+
+    def test_plan_attach_rejects_invalid_or_duplicate_documents(self) -> None:
+        active = self.create_goal()
+        plan = self.create_plan("valid.md")
+        outside = self.root / "outside.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        non_markdown = self.create_plan("invalid.txt")
+        original = active.read_bytes()
+        original_current = (self.root / "docs" / "CURRENT.md").read_bytes()
+        invalid = (
+            ("docs/technical-plans/missing.md", "不存在"),
+            (non_markdown.relative_to(self.root).as_posix(), "Markdown"),
+            (outside.relative_to(self.root).as_posix(), "必须位于"),
+            (str(plan.resolve()), "相对路径"),
+            ("docs/technical-plans/../../outside.md", "必须位于"),
+        )
+        for document, message in invalid:
+            result, _, error = self.run_main(
+                "plan", "attach", active.name, document
+            )
+            self.assertEqual(2, result)
+            self.assertIn(message, error)
+            self.assertEqual(original, active.read_bytes())
+            self.assertEqual(
+                original_current, (self.root / "docs" / "CURRENT.md").read_bytes()
+            )
+
+        relative = plan.relative_to(self.root).as_posix()
+        result, _, error = self.run_main("plan", "attach", active.name, relative)
+        self.assertEqual(0, result, error)
+        attached = active.read_bytes()
+        current = (self.root / "docs" / "CURRENT.md").read_bytes()
+        result, _, error = self.run_main("plan", "attach", active.name, relative)
+        self.assertEqual(2, result)
+        self.assertIn("已关联", error)
+        self.assertEqual(attached, active.read_bytes())
+        self.assertEqual(current, (self.root / "docs" / "CURRENT.md").read_bytes())
+
+    def test_doctor_validates_malformed_outside_duplicate_and_archived_links(
+        self,
+    ) -> None:
+        active = self.create_goal()
+        plan = self.create_plan("archive-plan.md")
+        relative = plan.relative_to(self.root).as_posix()
+        result, _, error = self.run_main("plan", "attach", active.name, relative)
+        self.assertEqual(0, result, error)
+
+        valid = active.read_text(encoding="utf-8")
+        link = "- [archive-plan.md](../../docs/technical-plans/archive-plan.md)"
+        active.write_text(valid.replace(link, f"{link}\n{link}"), encoding="utf-8")
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("plan.duplicate", output)
+
+        active.write_text(
+            valid.replace(
+                link, "- [outside.md](../../outside.md)"
+            ),
+            encoding="utf-8",
+        )
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("plan.link", output)
+
+        active.write_text(valid.replace(link, "- not-a-link"), encoding="utf-8")
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("goal.parse", output)
+
+        active.write_text(valid, encoding="utf-8")
+        result, _, error = self.run_main(
+            "checkpoint", active.name, "--satisfy", "1", "--satisfy", "2"
+        )
+        self.assertEqual(0, result, error)
+        result, _, error = self.run_main(
+            "complete", active.name, "--result", "Done", "--evidence", "Verified"
+        )
+        self.assertEqual(0, result, error)
+        archive = self.root / "goals" / "archive" / active.name
+        self.assertIn(link, archive.read_text(encoding="utf-8"))
+        plan.unlink()
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("plan.missing", output)
+
     def test_invalid_slug_and_duplicate_do_not_change_current(self) -> None:
         original = (self.root / "docs" / "CURRENT.md").read_bytes()
         result, _, error = self.run_main(
@@ -250,6 +401,15 @@ class GoalFrameworkTests(unittest.TestCase):
         second = self.create_goal("export-json")
         snapshots = {first: first.read_bytes(), second: second.read_bytes()}
         result, _, error = self.run_main("checkpoint", "export", "--done", "Ambiguous")
+        self.assertEqual(2, result)
+        self.assertIn("不唯一", error)
+        self.assertEqual(snapshots[first], first.read_bytes())
+        self.assertEqual(snapshots[second], second.read_bytes())
+
+        plan = self.create_plan("ambiguous.md")
+        result, _, error = self.run_main(
+            "plan", "attach", "export", plan.relative_to(self.root).as_posix()
+        )
         self.assertEqual(2, result)
         self.assertIn("不唯一", error)
         self.assertEqual(snapshots[first], first.read_bytes())
@@ -358,6 +518,42 @@ class GoalFrameworkTests(unittest.TestCase):
             core.dispatch(core.Project(self.root), parsed)
         target = self.root / "goals" / "active" / f"{TODAY}-rollback.md"
         self.assertFalse(target.exists())
+        self.assertEqual(original_current, current_path.read_bytes())
+        self.assertFalse((self.root / core.model.LOCK_FILE).exists())
+
+    def test_plan_attach_rolls_back_when_current_write_fails(self) -> None:
+        active = self.create_goal()
+        plan = self.create_plan("rollback-plan.md")
+        original_goal = active.read_bytes()
+        current_path = self.root / "docs" / "CURRENT.md"
+        original_current = current_path.read_bytes()
+        original_atomic_write = core.model.atomic_write
+        calls = 0
+
+        def fail_second_write(path: Path, content: str) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("simulated plan write failure")
+            original_atomic_write(path, content)
+
+        arguments = [
+            "--project",
+            str(self.root),
+            "plan",
+            "attach",
+            active.name,
+            plan.relative_to(self.root).as_posix(),
+        ]
+        with (
+            mock.patch.object(
+                core.model, "atomic_write", side_effect=fail_second_write
+            ),
+            self.assertRaises(OSError),
+        ):
+            parsed = core.build_parser().parse_args(arguments)
+            core.dispatch(core.Project(self.root), parsed)
+        self.assertEqual(original_goal, active.read_bytes())
         self.assertEqual(original_current, current_path.read_bytes())
         self.assertFalse((self.root / core.model.LOCK_FILE).exists())
 

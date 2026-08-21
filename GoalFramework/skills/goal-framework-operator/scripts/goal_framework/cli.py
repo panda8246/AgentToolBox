@@ -13,6 +13,8 @@ from .commands import (
     complete_command,
     doctor_command,
     new_command,
+    plan_attach_command,
+    plan_detach_command,
     status_command,
 )
 from .model import VALID_TYPES, GoalFrameworkError, Project, ProjectLock
@@ -69,6 +71,18 @@ def build_parser() -> argparse.ArgumentParser:
     complete.add_argument("goal")
     complete.add_argument("--result", required=True)
     complete.add_argument("--evidence", action="append", required=True)
+    plan = subparsers.add_parser("plan", help="Manage technical plan links")
+    plan_subparsers = plan.add_subparsers(dest="plan_command", required=True)
+    attach = plan_subparsers.add_parser(
+        "attach", help="Attach an existing technical plan to an active goal"
+    )
+    attach.add_argument("goal")
+    attach.add_argument("document")
+    detach = plan_subparsers.add_parser(
+        "detach", help="Detach a technical plan without deleting it"
+    )
+    detach.add_argument("goal")
+    detach.add_argument("document")
     return parser
 
 
@@ -85,6 +99,11 @@ def dispatch(project: Project, args: argparse.Namespace) -> int:
             return checkpoint_command(project, args)
         if args.command == "complete":
             return complete_command(project, args)
+        if args.command == "plan":
+            if args.plan_command == "attach":
+                return plan_attach_command(project, args)
+            if args.plan_command == "detach":
+                return plan_detach_command(project, args)
     raise AssertionError(f"Unhandled command: {args.command}")
 
 

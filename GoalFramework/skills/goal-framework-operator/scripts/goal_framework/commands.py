@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 from .model import (
     END_MARKER,
@@ -17,12 +19,14 @@ from .model import (
     SLUG_RE,
     START_MARKER,
     STATE_FILE,
+    TECHNICAL_PLANS_DIR,
     VALID_STATUSES,
     VALID_TYPES,
     FileTransaction,
     GoalDocument,
     GoalFrameworkError,
     Project,
+    TechnicalPlanLink,
     parse_numbered_items,
     parse_subsection_bullets,
     read_text,
@@ -32,6 +36,7 @@ from .model import (
     render_progress,
     replace_metadata,
     replace_section,
+    replace_technical_plan_links,
     section_body,
     today_iso,
     update_current,
@@ -50,8 +55,116 @@ def status_command(project: Project) -> int:
     for goal in goals:
         complete = sum(checked for checked, _ in goal.conditions)
         print(
-            f"- {goal.path.name} | {goal.status} | 完成条件 {complete}/{len(goal.conditions)} | {goal.title}"
+            f"- {goal.path.name} | {goal.status} | "
+            f"完成条件 {complete}/{len(goal.conditions)} | "
+            f"技术方案 {len(goal.technical_plans)} | {goal.title}"
         )
+    return 0
+
+
+def normalize_plan_document(
+    project: Project, value: str, *, require_exists: bool
+) -> Path:
+    if not value.strip():
+        raise GoalFrameworkError("技术方案路径不能为空。")
+    supplied = Path(value)
+    if supplied.is_absolute():
+        raise GoalFrameworkError("技术方案必须使用项目相对路径。")
+    plan_root = (project.root / TECHNICAL_PLANS_DIR).resolve()
+    resolved = (project.root / supplied).resolve()
+    if not resolved.is_relative_to(plan_root):
+        raise GoalFrameworkError(
+            f"技术方案必须位于 {TECHNICAL_PLANS_DIR.as_posix()}/。"
+        )
+    if resolved.suffix.lower() != ".md":
+        raise GoalFrameworkError("技术方案必须是 Markdown 文件（.md）。")
+    if require_exists and not resolved.is_file():
+        raise GoalFrameworkError(f"技术方案不存在：{value}")
+    return resolved.relative_to(project.root)
+
+
+def resolve_linked_plan(
+    project: Project, goal_path: Path, link: TechnicalPlanLink
+) -> Path:
+    decoded = unquote(link.target)
+    supplied = Path(decoded)
+    if supplied.is_absolute():
+        raise GoalFrameworkError("技术方案链接必须使用相对路径。")
+    plan_root = (project.root / TECHNICAL_PLANS_DIR).resolve()
+    resolved = (goal_path.parent / supplied).resolve()
+    if not resolved.is_relative_to(plan_root):
+        raise GoalFrameworkError(
+            f"技术方案链接越出 {TECHNICAL_PLANS_DIR.as_posix()}/：{link.target}"
+        )
+    if resolved.suffix.lower() != ".md":
+        raise GoalFrameworkError(f"技术方案链接不是 Markdown 文件：{link.target}")
+    return resolved.relative_to(project.root)
+
+
+def render_plan_target(goal_path: Path, document_path: Path, project: Project) -> str:
+    relative = Path(
+        os.path.relpath(project.root / document_path, start=goal_path.parent)
+    ).as_posix()
+    return quote(relative, safe="/-._~")
+
+
+def escape_link_label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def update_goal_plans(
+    project: Project, goal: GoalDocument, links: list[TechnicalPlanLink]
+) -> None:
+    updated = today_iso()
+    text = replace_technical_plan_links(goal.text, links)
+    text = replace_metadata(text, "最近更新", updated)
+    updated_goal = GoalDocument.from_text(goal.path, text)
+    goals = [
+        updated_goal if item.path == goal.path else item
+        for item in project.active_goals()
+    ]
+    current_text = update_current(read_text(project.current_path), goals, updated)
+    transaction = FileTransaction()
+    transaction.write(goal.path, text)
+    transaction.write(project.current_path, current_text)
+    transaction.commit()
+
+
+def plan_attach_command(project: Project, args: argparse.Namespace) -> int:
+    project.require_initialized()
+    goal = project.resolve_active(args.goal)
+    document = normalize_plan_document(project, args.document, require_exists=True)
+    linked_documents = [
+        resolve_linked_plan(project, goal.path, link) for link in goal.technical_plans
+    ]
+    if document in linked_documents:
+        raise GoalFrameworkError(f"目标已关联技术方案：{document.as_posix()}")
+    link = TechnicalPlanLink(
+        label=escape_link_label(document.name),
+        target=render_plan_target(goal.path, document, project),
+    )
+    update_goal_plans(project, goal, [*goal.technical_plans, link])
+    print(
+        f"已关联：{goal.path.relative_to(project.root)} -> {document.as_posix()}"
+    )
+    return 0
+
+
+def plan_detach_command(project: Project, args: argparse.Namespace) -> int:
+    project.require_initialized()
+    goal = project.resolve_active(args.goal)
+    document = normalize_plan_document(project, args.document, require_exists=False)
+    remaining = [
+        link
+        for link in goal.technical_plans
+        if resolve_linked_plan(project, goal.path, link) != document
+    ]
+    if len(remaining) == len(goal.technical_plans):
+        raise GoalFrameworkError(f"目标未关联技术方案：{document.as_posix()}")
+    update_goal_plans(project, goal, remaining)
+    print(
+        f"已解除关联：{goal.path.relative_to(project.root)} -> {document.as_posix()}"
+    )
     return 0
 
 
@@ -272,6 +385,38 @@ def inspect_goal(path: Path, *, archived: bool) -> list[Finding]:
     return findings
 
 
+def inspect_technical_plans(project: Project, goal: GoalDocument) -> list[Finding]:
+    findings: list[Finding] = []
+    seen: set[Path] = set()
+    for link in goal.technical_plans:
+        try:
+            document = resolve_linked_plan(project, goal.path, link)
+        except GoalFrameworkError as exc:
+            findings.append(
+                Finding("ERROR", "plan.link", f"{goal.path.name}: {exc}")
+            )
+            continue
+        if document in seen:
+            findings.append(
+                Finding(
+                    "ERROR",
+                    "plan.duplicate",
+                    f"{goal.path.name}: 重复关联 {document.as_posix()}",
+                )
+            )
+            continue
+        seen.add(document)
+        if not (project.root / document).is_file():
+            findings.append(
+                Finding(
+                    "ERROR",
+                    "plan.missing",
+                    f"{goal.path.name}: 技术方案不存在 {document.as_posix()}",
+                )
+            )
+    return findings
+
+
 def doctor_findings(project: Project) -> list[Finding]:
     findings: list[Finding] = []
     required = (
@@ -317,9 +462,21 @@ def doctor_findings(project: Project) -> list[Finding]:
     if project.active_dir.is_dir():
         for path in sorted(project.active_dir.glob("*.md")):
             findings.extend(inspect_goal(path, archived=False))
+            try:
+                findings.extend(
+                    inspect_technical_plans(project, GoalDocument.load(path))
+                )
+            except GoalFrameworkError:
+                pass
     if project.archive_dir.is_dir():
         for path in sorted(project.archive_dir.glob("*.md")):
             findings.extend(inspect_goal(path, archived=True))
+            try:
+                findings.extend(
+                    inspect_technical_plans(project, GoalDocument.load(path))
+                )
+            except GoalFrameworkError:
+                pass
     if project.current_path.is_file() and project.active_dir.is_dir():
         try:
             current = read_text(project.current_path)

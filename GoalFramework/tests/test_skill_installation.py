@@ -96,6 +96,7 @@ class SkillInstallationTests(unittest.TestCase):
         )
         self.assertEqual(0, doctor.returncode, doctor.stderr + doctor.stdout)
         self.assertIn("检查通过", doctor.stdout)
+        self.assertFalse((self.project / "docs" / "technical-plans").exists())
 
     def test_init_dry_run_does_not_create_project_files(self) -> None:
         result = self.run_python(
@@ -186,14 +187,23 @@ class SkillInstallationTests(unittest.TestCase):
             current_path.read_text(encoding="utf-8") + "\n<!-- keep-project-state -->\n"
         )
         current_path.write_text(current, encoding="utf-8")
+        plan_path = self.project / "docs" / "technical-plans" / "preserved.md"
+        plan_path.parent.mkdir(parents=True)
+        plan_path.write_text("user-owned technical plan\n", encoding="utf-8")
+        active_path = self.project / "goals" / "active" / "2026-01-01-existing.md"
+        active_path.write_text("user-owned goal\n", encoding="utf-8")
 
         result = self.run_python(
             UPDATE_COMMAND, "--project-path", str(self.project), "--yes"
         )
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("1.2.0 → 1.3.0", result.stdout)
+        self.assertIn(f"1.2.0 → {FRAMEWORK_VERSION}", result.stdout)
         self.assertEqual(source_runtime_files(), self.installed_files())
         self.assertIn("keep-project-state", current_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            "user-owned technical plan\n", plan_path.read_text(encoding="utf-8")
+        )
+        self.assertEqual("user-owned goal\n", active_path.read_text(encoding="utf-8"))
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(FRAMEWORK_VERSION, state["version"])
 

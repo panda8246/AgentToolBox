@@ -52,6 +52,24 @@
         ".goal-framework.json"
       ],
       "manualActions": []
+    },
+    {
+      "version": "1.4.0",
+      "changes": [
+        "目标文件新增可选的技术方案链接区块，支持关联 docs/technical-plans/ 中零到多份自由格式 Markdown。",
+        "goal-framework-operator 新增 plan attach/detach，并由 status 与 doctor 展示和校验关联。",
+        "Agent 规则要求仅按用户明确请求留档技术方案，并在编码前阅读全部关联方案。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        "goals/GOAL-TEMPLATE.md",
+        "skills/goal-framework-operator (框架发行包)",
+        ".goal-framework.json"
+      ],
+      "manualActions": [
+        "不会改写已有目标或创建 docs/technical-plans/。旧目标仍然有效；首次执行 plan attach 时会自动加入技术方案区块。",
+        "不会创建、修改、移动或删除 docs/technical-plans/ 中的技术文档。"
+      ]
     }
   ]
 }

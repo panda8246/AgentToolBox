@@ -19,8 +19,13 @@ FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CHECK_RE = re.compile(r"^- \[([ xX])\] (.+)$")
 LINK_RE = re.compile(r"\]\(\.\./goals/active/([^)]+\.md)\)")
+TECHNICAL_PLAN_LINK_RE = re.compile(
+    r"^- \[(?P<label>(?:\\.|[^\]])+)\]\((?P<target>[^()\s]+)\)$"
+)
 
 GOAL_HEADINGS = ("目的", "完成条件", "当前进度", "下一步", "结果与归档")
+TECHNICAL_PLAN_HEADING = "技术方案"
+TECHNICAL_PLANS_DIR = Path("docs") / "technical-plans"
 VALID_TYPES = {"delivery": "交付型", "exploration": "探索型"}
 VALID_STATUSES = {"待开始", "进行中", "阻塞", "已完成"}
 
@@ -214,6 +219,77 @@ def render_checklist(conditions: Sequence[tuple[bool, str]]) -> str:
     )
 
 
+@dataclass(frozen=True)
+class TechnicalPlanLink:
+    label: str
+    target: str
+
+
+def technical_plan_links(text: str) -> list[TechnicalPlanLink]:
+    matches = list(
+        re.finditer(
+            rf"^## {re.escape(TECHNICAL_PLAN_HEADING)}\s*$", text, re.MULTILINE
+        )
+    )
+    if not matches:
+        return []
+    if len(matches) > 1:
+        raise GoalFrameworkError(
+            f"应最多有一个二级标题“{TECHNICAL_PLAN_HEADING}”，实际为 {len(matches)} 个。"
+        )
+    body = section_body(text, TECHNICAL_PLAN_HEADING)
+    content_lines = [
+        line.strip()
+        for line in body.splitlines()
+        if line.strip()
+        and not (line.strip().startswith("<!--") and line.strip().endswith("-->"))
+    ]
+    if not content_lines or content_lines in (["暂无。"], ["暂无"]):
+        return []
+    links: list[TechnicalPlanLink] = []
+    for line in content_lines:
+        match = TECHNICAL_PLAN_LINK_RE.fullmatch(line)
+        if not match:
+            raise GoalFrameworkError(
+                f"技术方案必须使用 Markdown 链接列表或“暂无。”：{line}"
+            )
+        links.append(
+            TechnicalPlanLink(
+                label=match.group("label"), target=match.group("target")
+            )
+        )
+    return links
+
+
+def render_technical_plan_links(links: Sequence[TechnicalPlanLink]) -> str:
+    if not links:
+        return "暂无。"
+    return "\n".join(f"- [{link.label}]({link.target})" for link in links)
+
+
+def replace_technical_plan_links(
+    text: str, links: Sequence[TechnicalPlanLink]
+) -> str:
+    body = render_technical_plan_links(links)
+    matches = list(
+        re.finditer(
+            rf"^## {re.escape(TECHNICAL_PLAN_HEADING)}\s*$", text, re.MULTILINE
+        )
+    )
+    if len(matches) == 1:
+        return replace_section(text, TECHNICAL_PLAN_HEADING, body)
+    if len(matches) > 1:
+        raise GoalFrameworkError(
+            f"应最多有一个二级标题“{TECHNICAL_PLAN_HEADING}”，实际为 {len(matches)} 个。"
+        )
+    progress_start, _, _ = section_span(text, "当前进度")
+    return (
+        text[:progress_start].rstrip()
+        + f"\n\n## {TECHNICAL_PLAN_HEADING}\n\n{body}\n\n"
+        + text[progress_start:].lstrip()
+    )
+
+
 def parse_subsection_bullets(body: str, heading: str) -> list[str]:
     pattern = re.compile(rf"^### {re.escape(heading)}\s*$", re.MULTILINE)
     match = pattern.search(body)
@@ -268,6 +344,7 @@ class GoalDocument:
     updated: str
     archived: str | None
     conditions: list[tuple[bool, str]]
+    technical_plans: list[TechnicalPlanLink]
 
     @classmethod
     def load(cls, path: Path) -> GoalDocument:
@@ -287,6 +364,7 @@ class GoalDocument:
             updated=metadata(text, "最近更新") or "",
             archived=metadata(text, "归档日期", required=False),
             conditions=checklist(text),
+            technical_plans=technical_plan_links(text),
         )
 
 
@@ -353,6 +431,10 @@ def render_goal(
 ## 完成条件
 
 {render_checklist(unchecked)}
+
+## 技术方案
+
+暂无。
 
 ## 当前进度
 

@@ -51,7 +51,8 @@ def print_migration_plan(releases: list[dict]) -> None:
         "\n自动更新：AGENTS.md 的受管区块、goals/GOAL-TEMPLATE.md、项目级 skill 与 .goal-framework.json。"
     )
     print(
-        "绝不自动修改：docs/PROJECT.md、docs/CURRENT.md、goals/active/*、goals/archive/*。"
+        "绝不自动修改：docs/PROJECT.md、docs/CURRENT.md、docs/technical-plans/*、"
+        "goals/active/*、goals/archive/*。"
     )
 
 

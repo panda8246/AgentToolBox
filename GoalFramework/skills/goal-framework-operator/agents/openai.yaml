@@ -1,4 +1,4 @@
 interface:
   display_name: "Goal Framework Operator"
-  short_description: "Manage durable project goals safely and consistently"
+  short_description: "Manage durable goals and their technical plan links safely"
   default_prompt: "Use $goal-framework-operator to inspect and advance the current project goal."

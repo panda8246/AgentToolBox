@@ -56,6 +56,7 @@ python3 /path/to/GoalFramework/bin/goal-update.py --yes
 AGENTS.md                      # 原有上下文 + Goal Framework 受管区块
 docs/PROJECT.md                # 长期愿景、边界、原则与阶段方向
 docs/CURRENT.md                # 唯一全局当前状态
+docs/technical-plans/          # 用户明确要求时保存的自由格式技术方案（按需创建）
 goals/GOAL-TEMPLATE.md         # 交付型 / 探索型目标模板
 goals/active/
 goals/archive/
@@ -76,7 +77,23 @@ python .agents/skills/goal-framework-operator/scripts/goal-framework --project .
 python .agents/skills/goal-framework-operator/scripts/goal-framework --project . status
 ```
 
-命令支持 `status`、`doctor`、`new`、`checkpoint` 与 `complete`。它不会使用 `goal`
+命令支持 `status`、`doctor`、`new`、`plan attach/detach`、`checkpoint` 与 `complete`。它不会使用 `goal`
 作为命令名，避免与 Codex 原生 `/goal` 混淆。项目的 `.goal-framework.json` 会记录
 skill 版本及受管文件；即使框架版本没有变化，再运行 `goal-update` 也会修复缺失或被修改的
 受管 skill 文件。
+
+## 技术方案关联
+
+技术方案与目标分离：仅当用户明确要求留档时，由 Agent 将自由格式 Markdown 保存到
+`docs/technical-plans/`。Goal Framework 不创建或解析技术方案正文，只通过目标文件中的普通
+Markdown 链接维护关联：
+
+```sh
+python .agents/skills/goal-framework-operator/scripts/goal-framework --project . plan attach \
+  2026-08-21-export-data.md docs/technical-plans/export-data.md
+python .agents/skills/goal-framework-operator/scripts/goal-framework --project . plan detach \
+  2026-08-21-export-data.md docs/technical-plans/export-data.md
+```
+
+一个目标可关联多份方案，也可以不关联。`doctor` 会检查已有链接是否位于规定目录、是否重复及
+技术方案文件是否存在；解除关联不会删除技术文档。目标归档后链接保持不变。

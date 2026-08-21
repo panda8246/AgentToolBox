@@ -1,6 +1,6 @@
 ---
 name: goal-framework-operator
-description: Operate repositories initialized with Goal Framework safely and consistently. Use when Codex needs to inspect goal status, create a delivery or exploration goal, record a checkpoint, mark completion criteria, archive a completed goal, diagnose framework drift, or reconcile docs/CURRENT.md with goals/active. Also use for requests such as “继续当前目标”, “新建/完成/归档目标”, “检查 goal framework”, or work explicitly referencing .goal-framework.json or a goals/active file. Do not use for Codex's native /goal runtime unless the request also involves repository Goal Framework files.
+description: Operate repositories initialized with Goal Framework safely and consistently. Use when Codex needs to inspect goal status, create a delivery or exploration goal, attach or detach a technical plan, record a checkpoint, mark completion criteria, archive a completed goal, diagnose framework drift, or reconcile docs/CURRENT.md with goals/active. Also use for requests such as “继续当前目标”, “关联技术方案”, “新建/完成/归档目标”, “检查 goal framework”, or work explicitly referencing .goal-framework.json or a goals/active file. Do not use for Codex's native /goal runtime unless the request also involves repository Goal Framework files.
 ---
 
 # Goal Framework Operator
@@ -23,11 +23,13 @@ If `python` is unavailable, locate a Python 3.10+ interpreter and use it explici
 
 1. Run `goal-framework doctor` before the first mutation in a session.
 2. Read `docs/PROJECT.md`, `docs/CURRENT.md`, and the relevant active goal before deciding what to change.
-3. Use `new` only for work needing independent progress, exploration, or acceptance. Do not create a goal for a small one-turn edit.
-4. Use `checkpoint` after meaningful, reusable progress. Record facts and evidence, not chat history.
-5. Verify every completion condition before marking it satisfied.
-6. Run `complete` only after every condition is checked. Provide concrete evidence and a concise result.
-7. Run `doctor` again after mutations and report any remaining warnings.
+3. Read every technical plan linked by the goal, in list order, before coding. If a plan conflicts with the goal or current code/configuration, report it and reconcile the documents before implementation.
+4. Create or edit files under `docs/technical-plans/` only when the user explicitly requests that the technical plan be saved. The plan body is free-form Markdown and is not managed by this command.
+5. Use `new` only for work needing independent progress, exploration, or acceptance. Do not create a goal for a small one-turn edit.
+6. Use `checkpoint` after meaningful, reusable progress. Record facts and evidence, not chat history.
+7. Verify every completion condition before marking it satisfied.
+8. Run `complete` only after every condition is checked. Provide concrete evidence and a concise result.
+9. Run `doctor` again after mutations and report any remaining warnings.
 
 ## Operations
 
@@ -53,6 +55,22 @@ python "$GF" --project . new \
 
 Use `--type exploration` when the output is a decision or evidence-backed conclusion.
 
+Attach an existing Markdown document under `docs/technical-plans/`. The document must already exist; repeat the command to attach more than one plan:
+
+```text
+python "$GF" --project . plan attach \
+  2026-08-17-add-export-support.md \
+  docs/technical-plans/export-support.md
+```
+
+Detach the link without deleting the technical plan. This also works when the linked document is already missing:
+
+```text
+python "$GF" --project . plan detach \
+  2026-08-17-add-export-support.md \
+  docs/technical-plans/export-support.md
+```
+
 Record a checkpoint. `--done` appends durable accomplishments; supplied current/blocked/next values replace those lists. Use the corresponding `--clear-*` flag to empty a list. `--satisfy` uses one-based completion-condition indexes:
 
 ```text
@@ -75,6 +93,8 @@ python "$GF" --project . complete 2026-08-17-add-export-support.md \
 ## Safety rules
 
 - Never hand-edit filenames or move goals when the command can do it.
+- Never create or revise a technical plan unless the user explicitly requests it. `plan attach/detach` manages links only and never writes the plan body.
+- Never silently implement around a conflict between a linked technical plan, the goal, and current code or configuration.
 - Never use `complete` to bypass unchecked conditions. Update or remove an invalid condition only after discussing the scope change with the user.
 - Do not invent evidence, dates, progress, blockers, or conclusions.
 - Stop on ambiguous goal references, malformed managed files, lock contention, or archive-name collisions.

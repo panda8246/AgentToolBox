@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## 1.4.0 — 2026-08-21
+
+- 目标可通过普通 Markdown 链接关联 `docs/technical-plans/` 中零到多份自由格式技术方案。
+- 新增 `goal-framework plan attach/detach`，以项目锁、原子写入和回滚保护链接变更。
+- `status` 显示技术方案数量，`doctor` 检查异常、越界、重复和失效链接。
+- 更新 Agent 与 operator skill 规则：仅按用户明确要求留档技术方案，编码前读取全部关联方案。
+
 ## 1.3.0 — 2026-08-17
 
 - `goal-init` 现在自动将 operator skill 安装到项目 `.agents/skills/`。
