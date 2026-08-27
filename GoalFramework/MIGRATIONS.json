@@ -86,6 +86,17 @@
       "manualActions": [
         "本次升级只更新受管提示词与 skill，不创建或修改 docs/technical-plans/、已有目标和项目状态文档。"
       ]
+    },
+    {
+      "version": "1.4.2",
+      "changes": [
+        "goal-init 和 goal-update 会检查项目根目录 .gitignore，并补充缺失的 Python 字节码缓存忽略规则。"
+      ],
+      "managedFiles": [
+        ".gitignore",
+        ".goal-framework.json"
+      ],
+      "manualActions": []
     }
   ]
 }

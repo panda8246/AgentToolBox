@@ -102,6 +102,27 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertIn("docs/technical-plans/<name>.md", agents)
         self.assertIn("普通的方案讨论、评审或头脑风暴不代表用户授权写文件", agents)
 
+        gitignore_rules = (self.project / ".gitignore").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        self.assertIn("__pycache__/", gitignore_rules)
+        self.assertIn("*.pyc", gitignore_rules)
+        self.assertIn("*.pyo", gitignore_rules)
+
+    def test_init_merges_missing_bytecode_rules_into_existing_gitignore(self) -> None:
+        gitignore_path = self.project / ".gitignore"
+        gitignore_path.write_text("node_modules/\n*.pyc\n", encoding="utf-8")
+
+        self.initialize()
+        updated = gitignore_path.read_text(encoding="utf-8")
+        self.assertIn("node_modules/\n", updated)
+        self.assertEqual(1, updated.splitlines().count("*.pyc"))
+        self.assertIn("__pycache__/", updated.splitlines())
+        self.assertIn("*.pyo", updated.splitlines())
+
+        self.initialize()
+        self.assertEqual(updated, gitignore_path.read_text(encoding="utf-8"))
+
     def test_init_dry_run_does_not_create_project_files(self) -> None:
         result = self.run_python(
             INIT_COMMAND,
@@ -156,6 +177,25 @@ class SkillInstallationTests(unittest.TestCase):
         files = set(state["skills"]["goal-framework-operator"]["files"])
         self.assertEqual(source_runtime_files(), files)
         self.assertFalse(any(path.endswith((".pyc", ".pyo")) for path in files))
+
+    def test_update_adds_bytecode_rules_for_existing_project(self) -> None:
+        self.initialize()
+        gitignore_path = self.project / ".gitignore"
+        gitignore_path.unlink()
+
+        state_path = self.project / ".goal-framework.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["version"] = "1.4.1"
+        state_path.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+        result = self.run_python(
+            UPDATE_COMMAND, "--project-path", str(self.project), "--yes"
+        )
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("1.4.1 → 1.4.2", result.stdout)
+        self.assertIn("__pycache__/", gitignore_path.read_text(encoding="utf-8"))
 
     def test_repository_gitignore_covers_python_bytecode(self) -> None:
         rules = (

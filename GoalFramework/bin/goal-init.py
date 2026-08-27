@@ -11,6 +11,7 @@ from goal_framework import (
     TEMPLATES,
     commands,
     copy_template,
+    ensure_python_bytecode_gitignore,
     merge_agents_section,
     status,
     sync_project_skills,
@@ -100,6 +101,7 @@ def main() -> int:
             (project / relative_path).mkdir(parents=True, exist_ok=True)
     merge_agents_section(project, args.dry_run)
     sync_project_skills(project, args.dry_run)
+    ensure_python_bytecode_gitignore(project, args.dry_run)
     write_state(project, dry_run=args.dry_run)
 
     if not args.no_agent_prompt:

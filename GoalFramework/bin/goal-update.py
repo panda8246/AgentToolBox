@@ -8,6 +8,7 @@ from pathlib import Path
 
 from goal_framework import (
     copy_template,
+    ensure_python_bytecode_gitignore,
     framework_version,
     merge_agents_section,
     migrations,
@@ -48,7 +49,7 @@ def print_migration_plan(releases: list[dict]) -> None:
         for action in release.get("manualActions", []):
             print(f"  - 需要留意：{action}")
     print(
-        "\n自动更新：AGENTS.md 的受管区块、goals/GOAL-TEMPLATE.md、项目级 skill 与 .goal-framework.json。"
+        "\n自动更新：AGENTS.md 的受管区块、goals/GOAL-TEMPLATE.md、项目级 skill、.gitignore 与 .goal-framework.json。"
     )
     print(
         "绝不自动修改：docs/PROJECT.md、docs/CURRENT.md、docs/technical-plans/*、"
@@ -76,6 +77,7 @@ def main() -> int:
     if current == latest:
         status(f"项目已是最新版本 {latest}。")
         sync_project_skills(project, args.dry_run)
+        ensure_python_bytecode_gitignore(project, args.dry_run)
         if not args.dry_run:
             write_state(project)
         return 0
@@ -96,6 +98,7 @@ def main() -> int:
     merge_agents_section(project, dry_run=False)
     copy_template(project, "goals/GOAL-TEMPLATE.md", force=True, dry_run=False)
     sync_project_skills(project, dry_run=False)
+    ensure_python_bytecode_gitignore(project, dry_run=False)
     write_state(project)
     status(f"已更新到 {latest}。请根据上方“需要留意”项目决定是否手动调整项目文档。")
     return 0

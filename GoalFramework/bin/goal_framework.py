@@ -19,6 +19,12 @@ STATE_FILE = ".goal-framework.json"
 SKILLS_ROOT = FRAMEWORK_ROOT / "skills"
 PROJECT_SKILLS_ROOT = Path(".agents") / "skills"
 MANAGED_SKILLS = ("goal-framework-operator",)
+PYTHON_BYTECODE_GITIGNORE_RULES = (
+    "__pycache__/",
+    "*.pyc",
+    "*.pyo",
+    "*$py.class",
+)
 
 
 def framework_version() -> str:
@@ -77,6 +83,33 @@ def merge_agents_section(project: Path, dry_run: bool) -> None:
         updated = current.rstrip() + "\n\n" + block
         status("合并 Goal Framework 规则到 AGENTS.md。")
     agents_path.write_text(updated, encoding="utf-8")
+
+
+def ensure_python_bytecode_gitignore(project: Path, dry_run: bool) -> None:
+    """Add missing Python bytecode ignore rules without changing user rules."""
+    gitignore_path = project / ".gitignore"
+    current = (
+        gitignore_path.read_text(encoding="utf-8-sig") if gitignore_path.exists() else ""
+    )
+    existing_rules = {
+        line.strip()
+        for line in current.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    missing_rules = [
+        rule for rule in PYTHON_BYTECODE_GITIGNORE_RULES if rule not in existing_rules
+    ]
+    if not missing_rules:
+        status(".gitignore 已包含 Python 字节码忽略规则。")
+        return
+
+    status(f"更新 .gitignore：添加 {len(missing_rules)} 条 Python 字节码忽略规则。")
+    if dry_run:
+        return
+
+    addition = "# Python bytecode caches\n" + "\n".join(missing_rules) + "\n"
+    separator = "" if not current else ("\n" if current.endswith("\n") else "\n\n")
+    gitignore_path.write_text(current + separator + addition, encoding="utf-8")
 
 
 def copy_template(

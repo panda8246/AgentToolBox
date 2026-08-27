@@ -69,6 +69,7 @@ goals/archive/
 `goal-init` 会自动将 `skills/goal-framework-operator/` 安装到项目的
 `.agents/skills/goal-framework-operator/`；`goal-update` 会同步其受管文件。测试、
 Python 缓存和其他开发文件不会复制到项目，用户在目标 skill 目录中自行添加的文件会保留。
+初始化还会检查项目根目录 `.gitignore`，补充缺失的 Python 字节码缓存忽略规则且不改写既有规则。
 
 安装后的 skill 通过 Python `goal-framework` 命令执行确定性的目标操作：
 
