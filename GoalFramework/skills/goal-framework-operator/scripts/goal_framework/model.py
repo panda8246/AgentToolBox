@@ -17,7 +17,7 @@ START_MARKER = "<!-- GOAL-FRAMEWORK:START -->"
 END_MARKER = "<!-- GOAL-FRAMEWORK:END -->"
 FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-CHECK_RE = re.compile(r"^- \[([ xX])\] (.+)$")
+CHECK_RE = re.compile(r"^(?P<indent> *)(?:- \[(?P<state>[ xX])\] )(?P<text>.+)$")
 LINK_RE = re.compile(r"\]\(\.\./goals/active/([^)]+\.md)\)")
 TECHNICAL_PLAN_LINK_RE = re.compile(
     r"^- \[(?P<label>(?:\\.|[^\]])+)\]\((?P<target>[^()\s]+)\)$"
@@ -199,24 +199,149 @@ def markdown_title(text: str) -> str:
     return matches[0]
 
 
-def checklist(text: str) -> list[tuple[bool, str]]:
-    conditions: list[tuple[bool, str]] = []
+@dataclass
+class CompletionCondition:
+    checked: bool
+    text: str
+    children: list[CompletionCondition] = field(default_factory=list)
+
+    @property
+    def is_leaf(self) -> bool:
+        return not self.children
+
+
+def condition_leaves(
+    conditions: Sequence[CompletionCondition],
+) -> list[CompletionCondition]:
+    return [
+        condition
+        for root in conditions
+        for condition in _walk_condition_leaves(root)
+    ]
+
+
+def _walk_condition_leaves(
+    condition: CompletionCondition,
+) -> list[CompletionCondition]:
+    if condition.is_leaf:
+        return [condition]
+    return [
+        descendant
+        for child in condition.children
+        for descendant in _walk_condition_leaves(child)
+    ]
+
+
+def condition_at(
+    conditions: Sequence[CompletionCondition], index: str
+) -> CompletionCondition:
+    try:
+        parts = [int(value) for value in index.split(".")]
+    except ValueError as exc:
+        raise GoalFrameworkError(f"完成条件索引无效：{index}") from exc
+    if not parts or any(value < 1 for value in parts):
+        raise GoalFrameworkError(f"完成条件索引无效：{index}")
+    siblings = conditions
+    selected: CompletionCondition | None = None
+    for value in parts:
+        if value > len(siblings):
+            raise GoalFrameworkError(f"完成条件索引越界：{index}")
+        selected = siblings[value - 1]
+        siblings = selected.children
+    assert selected is not None
+    return selected
+
+
+def refresh_condition_states(conditions: Sequence[CompletionCondition]) -> None:
+    for condition in conditions:
+        if condition.children:
+            refresh_condition_states(condition.children)
+            condition.checked = all(child.checked for child in condition.children)
+
+
+def checklist(text: str) -> list[CompletionCondition]:
+    conditions: list[CompletionCondition] = []
+    stack: list[CompletionCondition] = []
     for line in section_body(text, "完成条件").splitlines():
         if not line.strip():
             continue
-        match = CHECK_RE.fullmatch(line.strip())
+        match = CHECK_RE.fullmatch(line)
         if not match:
             raise GoalFrameworkError(f"完成条件必须使用复选框：{line.strip()}")
-        conditions.append((match.group(1).lower() == "x", match.group(2).strip()))
+        indent = len(match.group("indent"))
+        if indent % 2:
+            raise GoalFrameworkError("完成条件每一级必须使用两个空格缩进。")
+        depth = indent // 2
+        if depth > len(stack):
+            raise GoalFrameworkError("完成条件不能跳过嵌套层级。")
+        condition = CompletionCondition(
+            checked=match.group("state").lower() == "x",
+            text=match.group("text").strip(),
+        )
+        if depth == 0:
+            conditions.append(condition)
+        else:
+            stack[depth - 1].children.append(condition)
+        stack[depth:] = [condition]
     if not conditions:
         raise GoalFrameworkError("至少需要一个完成条件。")
+    for condition in _walk_conditions(conditions):
+        if condition.children and condition.checked != all(
+            child.checked for child in condition.children
+        ):
+            raise GoalFrameworkError(
+                f"父完成条件的勾选状态必须与直属子条件一致：{condition.text}"
+            )
     return conditions
 
 
-def render_checklist(conditions: Sequence[tuple[bool, str]]) -> str:
-    return "\n".join(
-        f"- [{'x' if checked else ' '}] {text}" for checked, text in conditions
-    )
+def _walk_conditions(
+    conditions: Sequence[CompletionCondition],
+) -> list[CompletionCondition]:
+    return [
+        condition
+        for root in conditions
+        for condition in [root, *_walk_conditions(root.children)]
+    ]
+
+
+def render_checklist(conditions: Sequence[CompletionCondition]) -> str:
+    lines: list[str] = []
+
+    def append(condition: CompletionCondition, depth: int) -> None:
+        state = "x" if condition.checked else " "
+        lines.append(f"{'  ' * depth}- [{state}] {condition.text}")
+        for child in condition.children:
+            append(child, depth + 1)
+
+    for condition in conditions:
+        append(condition, 0)
+    return "\n".join(lines)
+
+
+def conditions_from_arguments(values: Sequence[str]) -> list[CompletionCondition]:
+    conditions: list[CompletionCondition] = []
+    stack: list[CompletionCondition] = []
+    for raw_value in values:
+        value = raw_value.strip()
+        if not value:
+            continue
+        nested = re.fullmatch(r"(?P<markers>>+)\s+(?P<text>.+)", value)
+        depth = len(nested.group("markers")) if nested else 0
+        condition = CompletionCondition(
+            checked=False,
+            text=(nested.group("text") if nested else value).strip(),
+        )
+        if depth > len(stack):
+            raise GoalFrameworkError("新建完成条件不能跳过嵌套层级。")
+        if depth == 0:
+            conditions.append(condition)
+        else:
+            stack[depth - 1].children.append(condition)
+        stack[depth:] = [condition]
+    if not conditions:
+        raise GoalFrameworkError("至少需要一个非空完成条件。")
+    return conditions
 
 
 @dataclass(frozen=True)
@@ -343,7 +468,7 @@ class GoalDocument:
     created: str
     updated: str
     archived: str | None
-    conditions: list[tuple[bool, str]]
+    conditions: list[CompletionCondition]
     technical_plans: list[TechnicalPlanLink]
 
     @classmethod
@@ -416,7 +541,7 @@ class Project:
 def render_goal(
     *, title: str, goal_type: str, purpose: str, conditions: Sequence[str], created: str
 ) -> str:
-    unchecked = [(False, condition) for condition in conditions]
+    unchecked = conditions_from_arguments(conditions)
     return f"""# {title}
 
 - 类型：{goal_type}

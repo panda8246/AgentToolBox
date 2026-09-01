@@ -27,6 +27,9 @@ from .model import (
     GoalFrameworkError,
     Project,
     TechnicalPlanLink,
+    condition_at,
+    condition_leaves,
+    conditions_from_arguments,
     parse_numbered_items,
     parse_subsection_bullets,
     read_text,
@@ -34,6 +37,7 @@ from .model import (
     render_goal,
     render_next,
     render_progress,
+    refresh_condition_states,
     replace_metadata,
     replace_section,
     replace_technical_plan_links,
@@ -53,10 +57,11 @@ def status_command(project: Project) -> int:
         return 0
     print(f"活跃目标：{len(goals)}")
     for goal in goals:
-        complete = sum(checked for checked, _ in goal.conditions)
+        leaves = condition_leaves(goal.conditions)
+        complete = sum(condition.checked for condition in leaves)
         print(
             f"- {goal.path.name} | {goal.status} | "
-            f"完成条件 {complete}/{len(goal.conditions)} | "
+            f"完成条件 {complete}/{len(leaves)} | "
             f"技术方案 {len(goal.technical_plans)} | {goal.title}"
         )
     return 0
@@ -176,9 +181,7 @@ def new_command(project: Project, args: argparse.Namespace) -> int:
         )
     if not args.title.strip() or not args.purpose.strip():
         raise GoalFrameworkError("title 和 purpose 不能为空。")
-    conditions = [value.strip() for value in args.condition if value.strip()]
-    if not conditions:
-        raise GoalFrameworkError("至少需要一个非空完成条件。")
+    conditions_from_arguments(args.condition)
     current_date = today_iso()
     target = project.active_dir / f"{current_date}-{args.slug}.md"
     if target.exists():
@@ -189,7 +192,7 @@ def new_command(project: Project, args: argparse.Namespace) -> int:
         title=args.title.strip(),
         goal_type=VALID_TYPES[args.type],
         purpose=args.purpose.strip(),
-        conditions=conditions,
+        conditions=args.condition,
         created=current_date,
     )
     new_goal = GoalDocument.from_text(target, goal_text)
@@ -230,11 +233,15 @@ def checkpoint_command(project: Project, args: argparse.Namespace) -> int:
     if args.next is not None and args.clear_next:
         raise GoalFrameworkError("不能同时设置和清空下一步。")
 
-    conditions = list(goal.conditions)
+    conditions = goal.conditions
     for index in args.satisfy:
-        if index < 1 or index > len(conditions):
-            raise GoalFrameworkError(f"完成条件索引越界：{index}")
-        conditions[index - 1] = (True, conditions[index - 1][1])
+        condition = condition_at(conditions, index)
+        if not condition.is_leaf:
+            raise GoalFrameworkError(
+                f"父完成条件不能直接满足，请逐项验证其叶子条件：{index}"
+            )
+        condition.checked = True
+    refresh_condition_states(conditions)
 
     progress = section_body(goal.text, "当前进度")
     done = parse_subsection_bullets(progress, "已完成")
@@ -280,7 +287,11 @@ def checkpoint_command(project: Project, args: argparse.Namespace) -> int:
 def complete_command(project: Project, args: argparse.Namespace) -> int:
     project.require_initialized()
     goal = project.resolve_active(args.goal)
-    unchecked = [text for checked, text in goal.conditions if not checked]
+    unchecked = [
+        condition.text
+        for condition in condition_leaves(goal.conditions)
+        if not condition.checked
+    ]
     if unchecked:
         raise GoalFrameworkError("仍有未满足的完成条件：" + "；".join(unchecked))
     evidence = [value.strip() for value in args.evidence if value.strip()]

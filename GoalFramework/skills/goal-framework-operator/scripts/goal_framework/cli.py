@@ -33,9 +33,11 @@ def add_checkpoint_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--satisfy",
         action="append",
-        type=int,
         default=[],
-        help="Mark condition index satisfied",
+        help=(
+            "Mark a leaf condition satisfied by hierarchical index "
+            "(for example 1.2)"
+        ),
     )
     parser.add_argument("--clear-in-progress", action="store_true")
     parser.add_argument("--clear-blocked", action="store_true")
@@ -62,7 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--slug", required=True)
     create.add_argument("--type", choices=tuple(VALID_TYPES), required=True)
     create.add_argument("--purpose", required=True)
-    create.add_argument("--condition", action="append", required=True)
+    create.add_argument(
+        "--condition",
+        action="append",
+        required=True,
+        help="Add a condition; prefix with >, >>, ... to nest it",
+    )
     checkpoint = subparsers.add_parser(
         "checkpoint", help="Record progress and satisfy conditions"
     )

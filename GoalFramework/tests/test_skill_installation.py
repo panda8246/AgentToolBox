@@ -194,7 +194,9 @@ class SkillInstallationTests(unittest.TestCase):
             UPDATE_COMMAND, "--project-path", str(self.project), "--yes"
         )
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("1.4.1 → 1.4.2", result.stdout)
+        self.assertIn("1.4.1 → 1.4.3", result.stdout)
+        self.assertIn("1.4.2", result.stdout)
+        self.assertIn("1.4.3", result.stdout)
         self.assertIn("__pycache__/", gitignore_path.read_text(encoding="utf-8"))
 
     def test_repository_gitignore_covers_python_bytecode(self) -> None:

@@ -27,9 +27,10 @@ If `python` is unavailable, locate a Python 3.10+ interpreter and use it explici
 4. Treat ordinary discussion, review, or brainstorming as no authorization to write a technical plan. When the user explicitly asks to save one, follow the persistence workflow below.
 5. Use `new` only for work needing independent progress, exploration, or acceptance. Do not create a goal for a small one-turn edit.
 6. Use `checkpoint` after meaningful, reusable progress. Record facts and evidence, not chat history.
-7. Verify every completion condition before marking it satisfied.
-8. Run `complete` only after every condition is checked. Provide concrete evidence and a concise result.
-9. Run `doctor` again after mutations and report any remaining warnings.
+7. For complex goals, split broad completion conditions into nested, independently verifiable leaf conditions. Parent conditions summarize their children and are satisfied automatically only when every child is satisfied.
+8. Verify every leaf completion condition before marking it satisfied.
+9. Run `complete` only after every leaf condition is checked. Provide concrete evidence and a concise result.
+10. Run `doctor` again after mutations and report any remaining warnings.
 
 ## Technical plan persistence
 
@@ -51,7 +52,7 @@ python "$GF" --project . doctor
 python "$GF" --project . doctor --strict
 ```
 
-Create a goal. Use a lowercase ASCII slug; pass each verifiable condition separately:
+Create a goal. Use a lowercase ASCII slug; pass each verifiable condition separately. Prefix a condition with `> `, `>> `, and so on to nest it under the preceding condition:
 
 ```text
 python "$GF" --project . new \
@@ -59,8 +60,9 @@ python "$GF" --project . new \
   --slug add-export-support \
   --type delivery \
   --purpose "Let users export validated data." \
-  --condition "CSV export passes its integration tests" \
-  --condition "User documentation describes the workflow"
+  --condition "Export is ready" \
+  --condition "> CSV export passes its integration tests" \
+  --condition "> User documentation describes the workflow"
 ```
 
 Use `--type exploration` when the output is a decision or evidence-backed conclusion.
@@ -81,14 +83,14 @@ python "$GF" --project . plan detach \
   docs/technical-plans/export-support.md
 ```
 
-Record a checkpoint. `--done` appends durable accomplishments; supplied current/blocked/next values replace those lists. Use the corresponding `--clear-*` flag to empty a list. `--satisfy` uses one-based completion-condition indexes:
+Record a checkpoint. `--done` appends durable accomplishments; supplied current/blocked/next values replace those lists. Use the corresponding `--clear-*` flag to empty a list. `--satisfy` uses one-based hierarchical indexes such as `1.2`; only leaf conditions may be satisfied directly, and parent checkboxes are updated automatically:
 
 ```text
 python "$GF" --project . checkpoint 2026-08-17-add-export-support.md \
   --done "Implemented streaming CSV writer" \
   --in-progress "Add integration coverage" \
   --next "Run the full test suite" \
-  --satisfy 1
+  --satisfy 1.1
 ```
 
 Archive only after validation:

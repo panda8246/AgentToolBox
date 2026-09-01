@@ -192,6 +192,112 @@ class GoalFrameworkTests(unittest.TestCase):
         active = self.create_goal("choose-storage", "exploration")
         self.assertIn("- 类型：探索型", active.read_text(encoding="utf-8"))
 
+    def test_nested_conditions_report_leaf_progress_and_roll_up_parents(self) -> None:
+        result, _, error = self.run_main(
+            "new",
+            "--title",
+            "Nested delivery",
+            "--slug",
+            "nested-delivery",
+            "--type",
+            "delivery",
+            "--purpose",
+            "Show meaningful progress for a complex goal.",
+            "--condition",
+            "Release is ready",
+            "--condition",
+            "> Quality checks pass",
+            "--condition",
+            ">> Integration tests pass",
+            "--condition",
+            "> Documentation is updated",
+            "--condition",
+            "Stakeholders approve",
+        )
+        self.assertEqual(0, result, error)
+        active = (
+            self.root / "goals" / "active" / f"{TODAY}-nested-delivery.md"
+        )
+        text = active.read_text(encoding="utf-8")
+        self.assertIn(
+            "- [ ] Release is ready\n"
+            "  - [ ] Quality checks pass\n"
+            "    - [ ] Integration tests pass\n"
+            "  - [ ] Documentation is updated\n"
+            "- [ ] Stakeholders approve",
+            text,
+        )
+
+        result, output, error = self.run_main("status")
+        self.assertEqual(0, result, error)
+        self.assertIn("完成条件 0/3", output)
+
+        original = active.read_bytes()
+        result, _, error = self.run_main(
+            "checkpoint", active.name, "--satisfy", "1"
+        )
+        self.assertEqual(2, result)
+        self.assertIn("父完成条件不能直接满足", error)
+        self.assertEqual(original, active.read_bytes())
+
+        result, _, error = self.run_main(
+            "checkpoint",
+            active.name,
+            "--satisfy",
+            "1.1.1",
+            "--satisfy",
+            "1.2",
+        )
+        self.assertEqual(0, result, error)
+        text = active.read_text(encoding="utf-8")
+        self.assertIn("- [x] Release is ready", text)
+        self.assertIn("  - [x] Quality checks pass", text)
+        self.assertIn("    - [x] Integration tests pass", text)
+        self.assertIn("  - [x] Documentation is updated", text)
+
+        result, output, error = self.run_main("status")
+        self.assertEqual(0, result, error)
+        self.assertIn("完成条件 2/3", output)
+        result, _, error = self.run_main(
+            "complete", active.name, "--result", "Done", "--evidence", "Verified"
+        )
+        self.assertEqual(2, result)
+        self.assertIn("Stakeholders approve", error)
+
+        result, _, error = self.run_main(
+            "checkpoint", active.name, "--satisfy", "2"
+        )
+        self.assertEqual(0, result, error)
+        result, _, error = self.run_main(
+            "complete", active.name, "--result", "Done", "--evidence", "Verified"
+        )
+        self.assertEqual(0, result, error)
+
+    def test_doctor_rejects_invalid_nested_condition_structure(self) -> None:
+        active = self.create_goal()
+        valid = active.read_text(encoding="utf-8")
+        active.write_text(
+            valid.replace(
+                "- [ ] Integration tests pass",
+                "- [ ] Integration tests pass\n   - [ ] Odd indentation",
+            ),
+            encoding="utf-8",
+        )
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("每一级必须使用两个空格", output)
+
+        active.write_text(
+            valid.replace(
+                "- [ ] Integration tests pass",
+                "- [x] Integration tests pass\n  - [ ] Child is not done",
+            ),
+            encoding="utf-8",
+        )
+        result, output, _ = self.run_main("doctor")
+        self.assertEqual(1, result)
+        self.assertIn("父完成条件的勾选状态", output)
+
     def test_new_goal_has_optional_plan_section_and_old_goal_can_attach(self) -> None:
         active = self.create_goal()
         text = active.read_text(encoding="utf-8")

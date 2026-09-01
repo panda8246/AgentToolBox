@@ -64,6 +64,15 @@ goals/archive/
 
 完整版本历史见 `CHANGELOG.md`；机器可读取的跨版本迁移说明见 `MIGRATIONS.json`。
 
+## 版本号规则
+
+版本号使用 `主版本号.次版本号.修订号`：
+
+- 小功能、兼容性增强、缺陷修复、文档或模板调整等小迭代，只递增最后一位修订号。
+- 只有包含一组显著能力变化、代表阶段性大迭代时，才递增次版本号并将修订号归零。
+- 只有架构、兼容边界或产品代际发生重大变化时，才递增主版本号，并将其余位归零。
+- 难以判断时按小迭代处理，只递增修订号。
+
 ## Goal Framework Operator skill
 
 `goal-init` 会自动将 `skills/goal-framework-operator/` 安装到项目的
@@ -82,6 +91,10 @@ python .agents/skills/goal-framework-operator/scripts/goal-framework --project .
 作为命令名，避免与 Codex 原生 `/goal` 混淆。项目的 `.goal-framework.json` 会记录
 skill 版本及受管文件；即使框架版本没有变化，再运行 `goal-update` 也会修复缺失或被修改的
 受管 skill 文件。
+
+复杂目标的完成条件支持嵌套复选框。每层使用两个空格缩进，状态按叶子条件统计；父条件只做汇总，
+会在所有直属子条件满足时自动勾选。`checkpoint --satisfy` 使用 `1.2.1` 形式的层级索引且只接受
+叶子条件。`new --condition` 可用 `> `、`>> ` 前缀依次建立子条件和孙条件。
 
 ## 技术方案关联
 

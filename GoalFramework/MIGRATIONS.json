@@ -97,6 +97,23 @@
         ".goal-framework.json"
       ],
       "manualActions": []
+    },
+    {
+      "version": "1.4.3",
+      "changes": [
+        "完成条件支持每级两个空格缩进的嵌套复选框，父条件自动汇总，进度按叶子条件统计。",
+        "checkpoint --satisfy 支持层级索引，new --condition 支持使用 > 前缀创建嵌套结构。",
+        "明确小迭代只递增末位版本号，重大改动或阶段性大迭代才递增主版本号或次版本号。"
+      ],
+      "managedFiles": [
+        "AGENTS.md (GOAL-FRAMEWORK 受管区块)",
+        "goals/GOAL-TEMPLATE.md",
+        ".agents/skills/goal-framework-operator/**",
+        ".goal-framework.json"
+      ],
+      "manualActions": [
+        "已有扁平完成条件继续有效，无需迁移。人工添加嵌套条件时，每级使用两个空格缩进，并确保父条件勾选状态与其直属子条件一致。"
+      ]
     }
   ]
 }
