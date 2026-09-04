@@ -1,10 +1,10 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "initializedAt": "YYYY-MM-DD",
   "updatedAt": "YYYY-MM-DD",
   "skills": {
     "goal-framework-operator": {
-      "version": "1.4.3",
+      "version": "1.4.4",
       "files": [
         "SKILL.md",
         "agents/openai.yaml",

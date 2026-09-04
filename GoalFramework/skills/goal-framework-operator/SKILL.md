@@ -1,6 +1,6 @@
 ---
 name: goal-framework-operator
-description: Operate repositories initialized with Goal Framework safely and consistently. Use when Codex needs to inspect goal status, create a delivery or exploration goal, attach or detach a technical plan, record a checkpoint, mark completion criteria, archive a completed goal, diagnose framework drift, or reconcile docs/CURRENT.md with goals/active. Also use for requests such as “继续当前目标”, “关联技术方案”, “新建/完成/归档目标”, “检查 goal framework”, or work explicitly referencing .goal-framework.json or a goals/active file. Do not use for Codex's native /goal runtime unless the request also involves repository Goal Framework files.
+description: Operate repositories initialized with Goal Framework safely and consistently. Use when Codex needs to inspect goal status, create a delivery or exploration goal, attach or detach a technical plan, reconcile user feedback with recorded goals and plans, record a checkpoint, mark completion criteria, archive a completed goal, diagnose framework drift, or reconcile docs/CURRENT.md with goals/active. Also use for requests such as “继续当前目标”, “关联技术方案”, “新建/完成/归档目标”, “检查 goal framework”, or work explicitly referencing .goal-framework.json or a goals/active file. Do not use for Codex's native /goal runtime unless the request also involves repository Goal Framework files.
 ---
 
 # Goal Framework Operator
@@ -24,7 +24,7 @@ If `python` is unavailable, locate a Python 3.10+ interpreter and use it explici
 1. Run `goal-framework doctor` before the first mutation in a session.
 2. Read `docs/PROJECT.md`, `docs/CURRENT.md`, and the relevant active goal before deciding what to change.
 3. Read every technical plan linked by the goal, in list order, before coding. If a plan conflicts with the goal or current code/configuration, report it and reconcile the documents before implementation.
-4. Treat ordinary discussion, review, or brainstorming as no authorization to write a technical plan. When the user explicitly asks to save one, follow the persistence workflow below.
+4. Compare substantive user feedback with the active goal and all linked plans using the reconciliation workflow below. Ordinary discussion is not write authorization; an explicit save request or confirmed synchronization is.
 5. Use `new` only for work needing independent progress, exploration, or acceptance. Do not create a goal for a small one-turn edit.
 6. Use `checkpoint` after meaningful, reusable progress. Record facts and evidence, not chat history.
 7. For complex goals, split broad completion conditions into nested, independently verifiable leaf conditions. Parent conditions summarize their children and are satisfied automatically only when every child is satisfied.
@@ -32,13 +32,25 @@ If `python` is unavailable, locate a Python 3.10+ interpreter and use it explici
 9. Run `complete` only after every leaf condition is checked. Provide concrete evidence and a concise result.
 10. Run `doctor` again after mutations and report any remaining warnings.
 
+## Conversation changes and confirmed synchronization
+
+While advancing an active goal, detect both conflicts and substantive additions affecting its purpose, scope, acceptance conditions, or a plan's key technical decisions, implementation steps, or validation. Do not wait for a separate request to update documents.
+
+1. Exploratory questions, alternatives, and wording edits do not directly trigger synchronization. Batch concrete changes into one reminder before dependent implementation or the end of the discussion turn. Resolve ambiguous goal references first; do not automatically create a goal when none is active.
+2. Read the relevant goal and every linked plan before confirmation. Show **recorded agreement → proposed agreement**, identify previously unrecorded additions, affected file paths, and completed conditions needing revalidation. Include `docs/PROJECT.md` only when long-term boundaries or principles change.
+3. Offer **adopt and synchronize**, **keep the recorded agreement**, and **continue discussing**. Keeping the recorded agreement rejects this adjustment; continuing discussion leaves the agreement unchanged and pauses only work dependent on the unresolved difference.
+4. “Change it to B and implement it” still requires one synchronization confirmation unless document synchronization was explicitly authorized. Choosing adopt and synchronize, or explicitly requesting synchronization of the identified changes, authorizes the listed updates: carry them out without another save request. Do not reconfirm the same authorized change; confirm subsequent new differences.
+5. Run `doctor` before synchronization. Edit only affected sections, preserving unrelated content, valid evidence, and the existing format. Directly edit purpose, plan text, or acceptance conditions when no command supports the change. Revalidate completed conditions whose meaning changed; uncheck those lacking evidence and recompute parent checkboxes from their children. Use `checkpoint` to record the confirmed change and maintain progress and `docs/CURRENT.md`; it also refreshes parent conditions. Preserve unrelated progress/blockers/next steps when supplying replacement lists. Use `plan attach/detach` for link changes.
+6. Do not automatically create a missing plan. If new persistence is needed, include the proposed path in confirmation, then use the persistence workflow after authorization.
+7. Run `doctor` after updates and check that their meaning matches the confirmed agreement. Report files, key changes, and validation results. On partial failure, identify completed and outstanding updates and pause implementation dependent on document consistency. `doctor` validates structure and links, not conversational semantic consistency.
+
 ## Technical plan persistence
 
-When the user explicitly asks to save, persist, record, or archive a technical plan (or clearly expresses equivalent intent):
+When the user explicitly asks to save, persist, record, or archive a technical plan (or clearly expresses equivalent intent), or authorizes a new plan in synchronization confirmation, follow this workflow. For authorized revisions of an existing plan, use the reconciliation workflow above.
 
 1. Distill the agreed plan into a standalone document. Preserve key decisions, implementation steps, validation, and unresolved items; do not copy the full chat transcript.
 2. Create `docs/technical-plans/` if needed and write a UTF-8 Markdown file named `docs/technical-plans/<descriptive-name>.md`. The body remains free-form and is not parsed by Goal Framework.
-3. Do not overwrite an existing document unless the user explicitly asked to update it. Choose a new descriptive filename on an unintended collision.
+3. Do not overwrite an existing document unless the user explicitly asked to update it or confirmed its synchronization. Choose a new descriptive filename on an unintended collision.
 4. If one active goal is clearly identified, run `plan attach` after the file is written. If no goal is known or the reference is ambiguous, do not guess: report that the document is saved but unlinked and ask which goal to use.
 5. Run `goal-framework doctor`, then report the document path, linked goal if any, and validation result.
 
@@ -105,7 +117,7 @@ python "$GF" --project . complete 2026-08-17-add-export-support.md \
 ## Safety rules
 
 - Never hand-edit filenames or move goals when the command can do it.
-- Never create or revise a technical plan unless the user explicitly requests it. `plan attach/detach` manages links only and never writes the plan body.
+- Create or revise a technical plan only after an explicit request or confirmation authorizing that synchronization. `plan attach/detach` manages links only and never writes the plan body.
 - Never silently implement around a conflict between a linked technical plan, the goal, and current code or configuration.
 - Never use `complete` to bypass unchecked conditions. Update or remove an invalid condition only after discussing the scope change with the user.
 - Do not invent evidence, dates, progress, blockers, or conclusions.

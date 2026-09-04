@@ -24,7 +24,7 @@
 
 ## 技术方案
 
-<!-- 可选。仅在用户明确要求留档后，关联 docs/technical-plans/ 中已有的 Markdown 文档。 -->
+<!-- 可选。在用户明确要求留档或确认同步中授权新建方案后，关联 docs/technical-plans/ 中已有的 Markdown 文档；已有方案的实质变更按 AGENTS.md 的确认同步流程更新。 -->
 
 暂无。
 

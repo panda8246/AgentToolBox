@@ -101,6 +101,7 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertIn("## 技术方案留档", agents)
         self.assertIn("docs/technical-plans/<name>.md", agents)
         self.assertIn("普通的方案讨论、评审或头脑风暴不代表用户授权写文件", agents)
+        self.assert_current_instructions_installed()
 
         gitignore_rules = (self.project / ".gitignore").read_text(
             encoding="utf-8"
@@ -194,7 +195,7 @@ class SkillInstallationTests(unittest.TestCase):
             UPDATE_COMMAND, "--project-path", str(self.project), "--yes"
         )
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("1.4.1 → 1.4.3", result.stdout)
+        self.assertIn(f"1.4.1 → {FRAMEWORK_VERSION}", result.stdout)
         self.assertIn("1.4.2", result.stdout)
         self.assertIn("1.4.3", result.stdout)
         self.assertIn("__pycache__/", gitignore_path.read_text(encoding="utf-8"))
@@ -253,14 +254,33 @@ class SkillInstallationTests(unittest.TestCase):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(FRAMEWORK_VERSION, state["version"])
 
-    def test_update_from_1_4_0_installs_persistence_prompt_without_touching_docs(
+    def assert_current_instructions_installed(self) -> None:
+        agents = (self.project / "AGENTS.md").read_text(encoding="utf-8")
+        managed = agents.split("<!-- GOAL-FRAMEWORK:START -->", 1)[1].split(
+            "<!-- GOAL-FRAMEWORK:END -->", 1
+        )[0].strip()
+        self.assertEqual(
+            (FRAMEWORK_ROOT / "templates" / "goal-framework-agents-section.md")
+            .read_text(encoding="utf-8").strip(),
+            managed,
+        )
+        self.assertEqual(
+            (SOURCE_SKILL / "SKILL.md").read_bytes(),
+            (self.project / INSTALLED_SKILL / "SKILL.md").read_bytes(),
+        )
+        self.assertEqual(
+            (FRAMEWORK_ROOT / "templates" / "goals" / "GOAL-TEMPLATE.md").read_bytes(),
+            (self.project / "goals" / "GOAL-TEMPLATE.md").read_bytes(),
+        )
+
+    def test_update_from_1_4_3_installs_current_rules_without_touching_user_content(
         self,
     ) -> None:
         self.initialize()
         state_path = self.project / ".goal-framework.json"
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        state["version"] = "1.4.0"
-        state["skills"]["goal-framework-operator"]["version"] = "1.4.0"
+        state["version"] = "1.4.3"
+        state["skills"]["goal-framework-operator"]["version"] = "1.4.3"
         state_path.write_text(
             json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -270,10 +290,13 @@ class SkillInstallationTests(unittest.TestCase):
             """# 项目 Agent 说明
 
 <!-- GOAL-FRAMEWORK:START -->
-# Goal Framework 1.4.0 rules
+# Goal Framework 1.4.3 rules
 
 - 技术方案仅在用户明确要求留档时创建。
 <!-- GOAL-FRAMEWORK:END -->
+
+## 自定义规则
+保留这条项目规则。
 """,
             encoding="utf-8",
         )
@@ -282,14 +305,35 @@ class SkillInstallationTests(unittest.TestCase):
         plan_path.write_text("keep this plan unchanged\n", encoding="utf-8")
         current_path = self.project / "docs" / "CURRENT.md"
         current_before = current_path.read_bytes()
+        preserved = {current_path: current_before}
+        project_path = self.project / "docs" / "PROJECT.md"
+        preserved[project_path] = project_path.read_bytes()
+        preserved[plan_path] = plan_path.read_bytes()
+        for relative in (
+            "goals/active/2026-09-01-existing.md",
+            "goals/archive/2026-09-02-archived.md",
+            ".agents/skills/goal-framework-operator/notes.local.md",
+        ):
+            path = self.project / relative
+            path.write_text("用户内容保持不变\n", encoding="utf-8")
+            preserved[path] = path.read_bytes()
+        (self.project / INSTALLED_SKILL / "SKILL.md").write_text(
+            "old skill instructions\n", encoding="utf-8"
+        )
 
         result = self.run_python(
             UPDATE_COMMAND, "--project-path", str(self.project), "--yes"
         )
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn(f"1.4.0 → {FRAMEWORK_VERSION}", result.stdout)
+        self.assertIn(f"1.4.3 → {FRAMEWORK_VERSION}", result.stdout)
+        self.assert_current_instructions_installed()
+        for path, content in preserved.items():
+            with self.subTest(path=path):
+                self.assertEqual(content, path.read_bytes())
 
         agents = agents_path.read_text(encoding="utf-8")
+        self.assertTrue(agents.startswith("# 项目 Agent 说明\n"))
+        self.assertIn("## 自定义规则\n保留这条项目规则。", agents)
         self.assertIn("## 技术方案留档", agents)
         self.assertIn("docs/technical-plans/<name>.md", agents)
         self.assertIn("运行 `goal-framework doctor`", agents)
@@ -303,6 +347,9 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual(current_before, current_path.read_bytes())
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(FRAMEWORK_VERSION, state["version"])
+        self.assertEqual(
+            FRAMEWORK_VERSION, state["skills"]["goal-framework-operator"]["version"]
+        )
 
 
 if __name__ == "__main__":
